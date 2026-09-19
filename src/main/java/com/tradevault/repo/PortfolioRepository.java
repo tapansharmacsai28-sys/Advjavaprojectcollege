@@ -1,0 +1,1 @@
+package com.tradevault.repo; import com.tradevault.model.Portfolio; import java.util.*; import org.springframework.data.jpa.repository.JpaRepository; public interface PortfolioRepository extends JpaRepository<Portfolio,Long>{List<Portfolio> findByOwnerIdOrderByCreatedDateDesc(Long id); Optional<Portfolio> findByIdAndOwnerId(Long id,Long ownerId);}

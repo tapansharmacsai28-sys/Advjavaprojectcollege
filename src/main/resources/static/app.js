@@ -20,15 +20,18 @@ document.querySelector('nav').insertAdjacentHTML('beforeend', '<button class="na
 async function api(path, options = {}) {
   if (!API_BASE && location.protocol === 'https:') throw new Error('The frontend API URL is not configured.');
   let response;
+  const request = (base) => fetch(`${base}/api${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) } });
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      response = await fetch(`${API_BASE}/api${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) } });
+      response = await request(API_BASE);
       break;
     } catch (error) {
-      if (attempt) throw new Error('Unable to reach TradeVault. Please try again.');
+      if (attempt) break;
       await new Promise((resolve) => setTimeout(resolve, 1200));
     }
   }
+  if (!response && API_BASE && location.hostname.endsWith('.vercel.app')) response = await request('');
+  if (!response) throw new Error('Unable to reach TradeVault. Please try again.');
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(data.message || 'Request failed. Please try again.');

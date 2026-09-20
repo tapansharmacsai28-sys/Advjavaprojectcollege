@@ -18,10 +18,17 @@ document.head.insertAdjacentHTML('beforeend', '<link rel="stylesheet" href="/cal
 document.querySelector('nav').insertAdjacentHTML('beforeend', '<button class="nav" data-view="calendar">▦ <span>Calendar</span></button>');
 
 async function api(path, options = {}) {
-  const response = await fetch(`${API_BASE}/api${path}`, {
-    ...options,
-    headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) }
-  });
+  if (!API_BASE && location.protocol === 'https:') throw new Error('The frontend API URL is not configured.');
+  let response;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      response = await fetch(`${API_BASE}/api${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) } });
+      break;
+    } catch (error) {
+      if (attempt) throw new Error('Unable to reach TradeVault. Please try again.');
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+    }
+  }
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const error = new Error(data.message || 'Request failed. Please try again.');
@@ -75,7 +82,7 @@ async function loadDashboard() {
 
 function metric(label, value, className = '') { return `<article class="card metric"><small>${label}</small><strong class="${className}">${value}</strong></article>`; }
 function metricGrid() {
-  return `<div class="metrics">${metric('Account equity', money(analytics.accountEquity))}${metric('Net realized P&L', money(analytics.netPnl), Number(analytics.netPnl) >= 0 ? 'up' : 'down')}${metric('Win rate', `${Number(analytics.winRate || 0).toFixed(1)}%`)}${metric('Profit factor', analytics.profitFactor || '0.00')}${metric('Active trades', analytics.activeTrades || 0)}${metric('Leverage usage', `${analytics.totalLeverage || 0}×`)}</div>`;
+  return `<div class="metrics">${metric('Account equity', money(analytics.accountEquity))}${metric('Net realized P&L', money(analytics.netPnl), Number(analytics.netPnl) >= 0 ? 'up' : 'down')}${metric('Win rate', `${Number(analytics.winRate || 0).toFixed(1)}%`)}${metric('Profit factor', analytics.profitFactor || '0.00')}${metric('Active trades', analytics.activeTrades || 0)}${metric('Leverage usage', `${analytics.totalLeverage || 0}×`)}</div><button id="editAccountEquity" class="text-button">Edit starting account equity</button>`;
 }
 function tableRows(detailed = false) {
   if (!trades.length) return `<tr><td colspan="15" class="empty">No trades yet. Add a trade to start building your journal.</td></tr>`;
@@ -152,12 +159,15 @@ folderTree = function (items, empty) {
 };
 const originalRiskView = riskView;
 riskView = function () {
-  const equity = analytics.accountEquity || 100000;
+  const equity = analytics.baseAccountEquity || 100000;
   return `<article class="card" style="margin-bottom:10px"><div class="section-title"><h2>Account equity</h2><small>User-entered value · INR</small></div><div class="calculator"><label>Account equity (₹)<input id="accountEquity" type="number" min="0" step=".01" value="${equity}"></label><button id="saveAccount" class="primary">Save equity</button></div></article>` + originalRiskView().replace('value="100000"', `value="${equity}"`);
 };
 document.addEventListener('click', async (event) => {
-  if (event.target.closest('#saveAccount')) {
-    try { await api('/account', { method: 'PUT', body: JSON.stringify({ accountEquity: Number($('#accountEquity').value) }) }); await loadDashboard(); render('risk'); } catch (error) { window.alert(error.message); }
+  if (event.target.closest('#saveAccount') || event.target.closest('#editAccountEquity')) {
+    const input = event.target.closest('#saveAccount') ? $('#accountEquity') : null;
+    const value = input ? Number(input.value) : Number(window.prompt('Starting account equity (₹)', analytics.baseAccountEquity || 100000));
+    if (!Number.isFinite(value) || value < 0) return;
+    try { await api('/account', { method: 'PUT', body: JSON.stringify({ accountEquity: value }) }); await loadDashboard(); if (input) render('risk'); } catch (error) { window.alert(error.message); }
     return;
   }
   const button = event.target.closest('.folder-delete,.folder-rename');

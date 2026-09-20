@@ -7,6 +7,7 @@ let token = sessionStorage.getItem('tvToken');
 let user = JSON.parse(sessionStorage.getItem('tvUser') || 'null');
 let trades = [];
 let analytics = {};
+let dashboardLoading = false;
 let screenshotData = null;
 let folders = { strategy: [], indicator: [] };
 let editingTradeId = null;
@@ -58,13 +59,17 @@ function showApp() {
 }
 
 async function loadDashboard() {
+  if (dashboardLoading || !token) return;
+  dashboardLoading = true;
   try {
-    const [journal, summary, strategyFolders, indicatorFolders] = await Promise.all([api('/trades'), api('/analytics'), api('/folders/strategy'), api('/folders/indicator')]);
-    trades = journal; analytics = summary; folders = { strategy: strategyFolders, indicator: indicatorFolders };
+    const data = await api('/dashboard');
+    trades = data.trades || []; analytics = data.analytics || {}; folders = { strategy: data.strategyFolders || [], indicator: data.indicatorFolders || [] };
     render(document.querySelector('.nav.active')?.dataset.view || 'dashboard');
   } catch (error) {
     if (error.status === 401) { clearSession(); return; }
     $('#content').innerHTML = `<article class="card empty"><h2>Dashboard data is temporarily unavailable</h2><p>${escapeHtml(error.message || 'Please try again in a moment.')}</p></article>`;
+  } finally {
+    dashboardLoading = false;
   }
 }
 

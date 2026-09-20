@@ -22,7 +22,11 @@ async function api(path, options = {}) {
     headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(options.headers || {}) }
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.message || 'Request failed. Please try again.');
+  if (!response.ok) {
+    const error = new Error(data.message || 'Request failed. Please try again.');
+    error.status = response.status;
+    throw error;
+  }
   return data;
 }
 
@@ -59,7 +63,8 @@ async function loadDashboard() {
     trades = journal; analytics = summary; folders = { strategy: strategyFolders, indicator: indicatorFolders };
     render(document.querySelector('.nav.active')?.dataset.view || 'dashboard');
   } catch (error) {
-    clearSession(); showApp();
+    if (error.status === 401) { clearSession(); return; }
+    $('#content').innerHTML = `<article class="card empty"><h2>Dashboard data is temporarily unavailable</h2><p>${escapeHtml(error.message || 'Please try again in a moment.')}</p></article>`;
   }
 }
 

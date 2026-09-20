@@ -118,7 +118,25 @@ function render(view) {
   if (view === 'journal') document.querySelectorAll('.edit-trade').forEach((button) => button.onclick = () => openTradeModal(trades.find((trade) => trade.id === Number(button.dataset.tradeId))));
   if (view === 'strategies') { $('#newStrategyFolder').onclick = () => createFolder('strategy'); $('#newIndicatorFolder').onclick = () => createFolder('indicator'); $('#strategyTrade').onclick = openTradeModal; if (!trades.length) { document.querySelector('.strategy-help').insertAdjacentHTML('beforeend', '<button class="text-button" id="loadDemo">Load presentation sample data</button>'); $('#loadDemo').onclick = loadPresentationData; } }
   if (view === 'calendar') { $('#previousMonth').onclick = () => { calendarOffset--; render('calendar'); }; $('#nextMonth').onclick = () => { calendarOffset++; render('calendar'); }; $('#currentMonth').onclick = () => { calendarOffset = 0; render('calendar'); }; }
-  if (view === 'risk') $('#calc').onclick = calculatePosition;
+  if (view === 'risk') {
+    $('#calc').onclick = calculatePosition;
+    const saveAccount = $('#saveAccount');
+    if (saveAccount) saveAccount.onclick = async () => {
+      const value = Number($('#accountEquity').value);
+      if (!Number.isFinite(value) || value < 0) { window.alert('Enter an account equity of zero or greater.'); return; }
+      saveAccount.disabled = true;
+      saveAccount.textContent = 'Saving…';
+      try {
+        await api('/account', { method: 'PUT', body: JSON.stringify({ accountEquity: value }) });
+        await loadDashboard();
+        render('risk');
+      } catch (error) {
+        window.alert(error.message);
+        saveAccount.disabled = false;
+        saveAccount.textContent = 'Save equity';
+      }
+    };
+  }
 }
 
 function setFolderChoices() { $('#strategyChoices').innerHTML = folders.strategy.map((folder) => `<option value="${escapeHtml(folder.name)}"></option>`).join(''); $('#indicatorChoices').innerHTML = folders.indicator.map((folder) => `<option value="${escapeHtml(folder.name)}"></option>`).join(''); $('#strategyPaths').innerHTML = folders.strategy.map((folder) => `<option value="${escapeHtml(folderPath(folder))}"></option>`).join(''); }
@@ -163,11 +181,10 @@ riskView = function () {
   return `<article class="card" style="margin-bottom:10px"><div class="section-title"><h2>Account equity</h2><small>User-entered value · INR</small></div><div class="calculator"><label>Account equity (₹)<input id="accountEquity" type="number" min="0" step=".01" value="${equity}"></label><button id="saveAccount" class="primary">Save equity</button></div></article>` + originalRiskView().replace('value="100000"', `value="${equity}"`);
 };
 document.addEventListener('click', async (event) => {
-  if (event.target.closest('#saveAccount') || event.target.closest('#editAccountEquity')) {
-    const input = event.target.closest('#saveAccount') ? $('#accountEquity') : null;
-    const value = input ? Number(input.value) : Number(window.prompt('Starting account equity (₹)', analytics.baseAccountEquity || 100000));
+  if (event.target.closest('#editAccountEquity')) {
+    const value = Number(window.prompt('Starting account equity (₹)', analytics.baseAccountEquity || 100000));
     if (!Number.isFinite(value) || value < 0) return;
-    try { await api('/account', { method: 'PUT', body: JSON.stringify({ accountEquity: value }) }); await loadDashboard(); if (input) render('risk'); } catch (error) { window.alert(error.message); }
+    try { await api('/account', { method: 'PUT', body: JSON.stringify({ accountEquity: value }) }); await loadDashboard(); } catch (error) { window.alert(error.message); }
     return;
   }
   const button = event.target.closest('.folder-delete,.folder-rename');

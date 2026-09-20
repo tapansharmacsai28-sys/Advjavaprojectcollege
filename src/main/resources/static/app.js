@@ -1,6 +1,6 @@
 const $ = (selector) => document.querySelector(selector);
 const API_BASE = window.TRADEVAULT_API_BASE || '';
-const money = (value) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(Number(value || 0));
+const money = (value) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(value || 0));
 const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
 
 let token = sessionStorage.getItem('tvToken');
@@ -37,6 +37,9 @@ function clearSession() {
   sessionStorage.removeItem('tvToken');
   sessionStorage.removeItem('tvUser');
   token = null; user = null; trades = []; analytics = {}; folders = { strategy: [], indicator: [] };
+  document.querySelectorAll('dialog[open]').forEach((dialog) => dialog.close());
+  $('#menu').hidden = true;
+  showApp();
 }
 
 function showApp() {
@@ -123,4 +126,44 @@ $('#screenshot').onchange = () => { const file = $('#screenshot').files[0]; if (
 $('#screenshotLabel').onclick = () => $('#screenshot').click();
 $('#tradeForm').onsubmit = async (event) => { event.preventDefault(); const payload = Object.fromEntries(new FormData(event.target)); delete payload.screenshot; ['quantity', 'entryPrice', 'exitPrice', 'leverage', 'feeRate', 'fixedCommission', 'riskPercent'].forEach((field) => payload[field] = Number(payload[field])); payload.screenshotData = screenshotData; try { await api(editingTradeId ? `/trades/${editingTradeId}` : '/trades', { method: editingTradeId ? 'PUT' : 'POST', body: JSON.stringify(payload) }); $('#tradeModal').close(); editingTradeId = null; await loadDashboard(); } catch (error) { $('#tradeError').textContent = error.message; } };
 document.querySelectorAll('.nav').forEach((button) => button.onclick = () => { document.querySelectorAll('.nav').forEach((item) => item.classList.toggle('active', item === button)); render(button.dataset.view); });
+// Lifecycle and folder controls extend the existing screens without changing their layout.
+const exitInput = document.querySelector('[name="exitPrice"]');
+if (exitInput) { exitInput.required = false; exitInput.placeholder = 'Optional — close later'; }
+const originalDashboard = dashboard;
+dashboard = function () {
+  const running = trades.filter((trade) => trade.status === 'RUNNING' || !trade.exitPrice);
+  const runningCard = `<article class="card" style="margin-top:10px"><div class="section-title"><h2>Running trades</h2><small>Open positions are excluded from realized performance</small></div>${running.length ? `<table><thead><tr><th>Instrument</th><th>Direction</th><th>Entry</th><th>Size</th><th>Leverage</th><th>Strategy</th><th>Indicator</th></tr></thead><tbody>${running.map((trade) => `<tr><td>${escapeHtml(trade.symbol)}</td><td><span class="pill">${escapeHtml(trade.side)}</span></td><td>${money(trade.entryPrice)}</td><td>${trade.quantity}</td><td>${trade.leverage}×</td><td>${escapeHtml(trade.strategyName || 'Unassigned')}</td><td>${escapeHtml(trade.indicatorsUsed || 'Unassigned')}</td></tr>`).join('')}</tbody></table>` : '<p class="empty">No running trades.</p>'}</article>`;
+  return originalDashboard() + runningCard;
+};
+const originalFolderTree = folderTree;
+folderTree = function (items, empty) {
+  if (!items.length) return originalFolderTree(items, empty);
+  return `<div class="folder-tree">${items.map((folder) => `<div class="folder-row"><span class="folder-icon">⌁</span><div><b>${escapeHtml(folder.name)}</b><small>${escapeHtml(folderPath(folder))}</small></div><span class="folder-count">${trades.filter((trade) => (trade.strategyName === folder.name || trade.indicatorsUsed === folder.name)).length} trades</span><span><button class="text-button folder-rename" data-folder-id="${folder.id}" data-folder-name="${escapeHtml(folder.name)}">Rename</button><button class="text-button folder-delete" data-folder-id="${folder.id}" data-folder-name="${escapeHtml(folder.name)}">Delete</button></span></div>`).join('')}</div>`;
+};
+const originalRiskView = riskView;
+riskView = function () {
+  const equity = analytics.accountEquity || 100000;
+  return `<article class="card" style="margin-bottom:10px"><div class="section-title"><h2>Account equity</h2><small>User-entered value · INR</small></div><div class="calculator"><label>Account equity (₹)<input id="accountEquity" type="number" min="0" step=".01" value="${equity}"></label><button id="saveAccount" class="primary">Save equity</button></div></article>` + originalRiskView().replace('value="100000"', `value="${equity}"`);
+};
+document.addEventListener('click', async (event) => {
+  if (event.target.closest('#saveAccount')) {
+    try { await api('/account', { method: 'PUT', body: JSON.stringify({ accountEquity: Number($('#accountEquity').value) }) }); await loadDashboard(); render('risk'); } catch (error) { window.alert(error.message); }
+    return;
+  }
+  const button = event.target.closest('.folder-delete,.folder-rename');
+  if (!button) return;
+  const id = button.dataset.folderId;
+  const name = button.dataset.folderName;
+  try {
+    if (button.classList.contains('folder-delete')) {
+      if (!window.confirm(`Delete ${name}? Historical trades will be preserved.`)) return;
+      await api(`/folders/${id}`, { method: 'DELETE' });
+    } else {
+      const next = window.prompt('Folder name', name);
+      if (!next?.trim()) return;
+      await api(`/folders/${id}`, { method: 'PUT', body: JSON.stringify({ name: next.trim(), parentPath: '/' }) });
+    }
+    await loadDashboard();
+  } catch (error) { window.alert(error.message); }
+});
 showApp();

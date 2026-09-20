@@ -1,0 +1,7 @@
+.git
+.vercel
+.idea
+data
+target
+.env
+.env.*

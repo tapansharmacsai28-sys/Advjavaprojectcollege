@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: tradevault-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod

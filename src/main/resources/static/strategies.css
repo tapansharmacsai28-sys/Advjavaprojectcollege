@@ -1,0 +1,11 @@
+.folder-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.folder-tree { display: grid; gap: 7px; }
+.folder-row { display: grid; grid-template-columns: 25px 1fr auto; align-items: center; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 7px; background: #090f1d; }
+.folder-icon { color: var(--yellow); font-size: 18px; }
+.folder-row b { display: block; }
+.folder-row small { display: block; margin-top: 3px; color: var(--muted); font: 10px 'DM Mono'; }
+.folder-count { color: var(--green); font: 10px 'DM Mono'; white-space: nowrap; }
+.folder-empty { padding: 22px; }
+.strategy-help p { color: var(--muted); line-height: 1.7; }
+.strategy-help .primary { margin-top: 10px; }
+@media (max-width: 950px) { .folder-grid { grid-template-columns: 1fr; } }

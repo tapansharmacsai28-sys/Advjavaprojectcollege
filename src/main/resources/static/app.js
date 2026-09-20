@@ -69,7 +69,17 @@ async function loadDashboard() {
   if (dashboardLoading || !token) return;
   dashboardLoading = true;
   try {
-    const data = await api('/dashboard');
+    let data;
+    try {
+      data = await api('/dashboard');
+    } catch (dashboardError) {
+      // A rolling backend deployment can briefly expose the individual APIs before
+      // the bundled dashboard endpoint is ready. Keep the signed-in experience usable.
+      const [journal, summary, strategyFolders, indicatorFolders] = await Promise.all([
+        api('/trades'), api('/analytics'), api('/folders/strategy'), api('/folders/indicator')
+      ]);
+      data = { trades: journal, analytics: summary, strategyFolders, indicatorFolders };
+    }
     trades = data.trades || []; analytics = data.analytics || {}; folders = { strategy: data.strategyFolders || [], indicator: data.indicatorFolders || [] };
     render(document.querySelector('.nav.active')?.dataset.view || 'dashboard');
   } catch (error) {

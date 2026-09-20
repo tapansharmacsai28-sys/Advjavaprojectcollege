@@ -30,11 +30,11 @@ TradeVault has two deployable parts:
 - **Frontend:** Vercel builds the static UI into `dist/`; `vercel.json` defines the build and output directory.
 - **Backend:** Deploy the Java 17 Spring Boot service to a JVM host such as Render, Railway, Fly.io, or a container host. Vercel is ideal for the static frontend, but it is not a persistent JVM application host or database host.
 
-For a split deployment, set `TRADEVAULT_CORS_ORIGINS` on the backend to the exact Vercel site origin. In Vercel Project Settings, set the non-secret build variable `TRADEVAULT_API_BASE` to the public HTTPS URL of the backend (for example, `https://tradevault-api.example.com`). The Vercel build writes that URL into the deployed frontend only; local Spring Boot use remains unchanged.
+For a split deployment, set `TRADEVAULT_CORS_ORIGINS` on the Render backend to the exact Vercel site origin (no trailing slash). In Vercel Project Settings, set the non-secret build variable `TRADEVAULT_API_BASE` to the public HTTPS URL of the Render backend (for example, `https://tradevault-api.example.com`). The Vercel build writes that URL into `window.TRADEVAULT_API_BASE` in the deployed frontend only; local Spring Boot use remains unchanged. If the backend is started without a CORS origin, it still starts for same-origin/local use but does not enable cross-origin API access.
 
 ## Production deployment
 
-`render.yaml` and the Java 17 `Dockerfile` define the Render web service. Create a Render PostgreSQL database in the same region, then add these **Render environment variables** to the API service. Do not commit their values.
+`render.yaml` and the Java 17 `Dockerfile` define the Render web service. The blueprint activates `prod` and declares the values that must be supplied in the Render dashboard for the existing `tradevault-db` database. Do not commit their values.
 
 ```text
 SPRING_PROFILES_ACTIVE=prod

@@ -8,3 +8,17 @@ services:
     envVars:
       - key: SPRING_PROFILES_ACTIVE
         value: prod
+      # Configure these in the Render dashboard for the existing tradevault-db.
+      # The datasource URL must be a JDBC URL without credentials embedded in it.
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: TRADEVAULT_JWT_SECRET
+        sync: false
+      # Set this to the exact Vercel deployment origin, for example
+      # https://your-project.vercel.app. It is intentionally not a secret.
+      - key: TRADEVAULT_CORS_ORIGINS
+        sync: false
